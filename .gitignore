@@ -1,0 +1,45 @@
+# STM32CubeIDE / Eclipse 项目中常见需要忽略的文件
+
+# 编译生成目录
+/Debug/
+/Release/
+/build/
+
+# CubeIDE 相关缓存和设置
+/.settings/
+/.metadata/
+/.project
+/.cproject
+/.loadpath
+/.externalToolBuilders/
+/.vscode/
+*.launch
+
+# 备份文件
+*.bak
+*.tmp
+*.swp
+*.swo
+
+# 自动生成的代码模板备份
+*.ioc-backup
+
+# 编译中间文件
+*.o
+*.d
+*.elf
+*.hex
+*.bin
+*.map
+*.lst
+
+# 系统文件
+Thumbs.db
+.DS_Store
+
+# CubeMX 生成日志
+*.log
+
+# 其他临时目录
+/.recommenders/
+.idea/
