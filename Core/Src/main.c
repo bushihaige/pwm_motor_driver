@@ -26,13 +26,12 @@
 #include <math.h>
 #include "stdio.h"
 #include "usart.h"
+#include "user_workspace.h"
 
-#define PI 3.1415926f
-#define PWM_MAX 999  // 对应 CubeMX 设置的 ARR 值
 
 //extern TIM_HandleTypeDef htim1;
 
-extern UART_HandleTypeDef huart1;
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -42,38 +41,7 @@ extern UART_HandleTypeDef huart1;
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-void SinPWM_Update(void)
-{
-    static float theta = 0.0f;
-    float Ua, Ub, Uc;
-    char msg[80];
 
-    // === 生成三相正弦波 (120° 相移) ===
-    Ua = (sinf(theta) + 1.0f) / 2.0f;
-    Ub = (sinf(theta + 2.0f * PI / 3.0f) + 1.0f) / 2.0f;
-    Uc = (sinf(theta + 4.0f * PI / 3.0f) + 1.0f) / 2.0f;
-
-    // === 更新三路 PWM 占空比 ===
-    //__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, Ua * PWM_MAX);
-    //__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_2, Ub * PWM_MAX);
-    //__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_3, Uc * PWM_MAX);
-
-    // === 打印实时数据到串口 ===
-    int len = sprintf(msg, "Ua=%.3f, Ub=%.3f, Uc=%.3f\r\n", Ua, Ub, Uc);
-    HAL_UART_Transmit(&huart1, (uint8_t*)msg, len, HAL_MAX_DELAY);
-
-    // === 更新角度（控制旋转速度） ===
-    theta += 0.02f;
-    if (theta >= 2.0f * PI)
-        theta -= 2.0f;
-}
-
-
-int fputc(int ch, FILE *f)
-{
-    HAL_UART_Transmit(&huart1, (uint8_t *)&ch, 1, HAL_MAX_DELAY);
-    return ch;
-}
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -129,15 +97,7 @@ int main(void)
   MX_GPIO_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
-  //HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
-  //HAL_TIMEx_PWMN_Start(&htim1, TIM_CHANNEL_1);  // CH1N 输出
-  //HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
-  //HAL_TIMEx_PWMN_Start(&htim1, TIM_CHANNEL_2);  // CH2N 输出
-  //HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_3);
-  //HAL_TIMEx_PWMN_Start(&htim1, TIM_CHANNEL_3);  // CH3N 输出
-
-  HAL_UART_Transmit(&huart1, (uint8_t*)"PWM Init OK\r\n", 13, HAL_MAX_DELAY);
-
+  User_Workspace_Init();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -147,20 +107,7 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
-	    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_SET);  // A相高
-	    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_RESET);
-	    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_RESET);
-	    HAL_Delay(500);
-
-	    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_RESET);
-	    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);  // B相高
-	    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_RESET);
-	    HAL_Delay(500);
-
-	    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_RESET);
-	    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_RESET);
-	    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_SET);  // C相高
-	    HAL_Delay(500);
+	  User_Workspace_Loop();
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
