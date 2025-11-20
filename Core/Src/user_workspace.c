@@ -13,13 +13,23 @@
 
 #define PWM_RES 200
 #define DELAY_US 10
-#define STEP_INC 0.1f  // 电角度增量（决定转速）
+#define STEP_INC 0.02f  // 电角度增量（决定转速）
 #define DUTY_CYCLE 0.2
 
 #define POLE_PAIRS 7   // 电机极对数
 
+//ADC define
+#define ADC_REF_VOLT    3.3f
+#define ADC_MAX_CODE    4095.0f
+#define VREF_OFFSET     1.65f     // INA199 REF=1.65V
+#define CURRENT_GAIN    5.0f      // 1/(0.01Ω * 20V/V)
+
 extern I2C_HandleTypeDef hi2c1;
 extern UART_HandleTypeDef huart1;
+
+//ADC extern
+extern ADC_HandleTypeDef hadc1;
+uint16_t adc_buf[3];
 
 void DWT_Init(void)
 {
@@ -35,7 +45,7 @@ void delay_us(uint32_t us)
     while ((DWT->CYCCNT - start) < ticks);
 }
 
-void motor_soft_pwm(void)
+void motor_spwm(void)
 {
 	static float theta = 0.0f;   // 电角度
 	float Ua = (sinf(POLE_PAIRS * theta) + 1.0f) / 2.0f;
@@ -54,54 +64,6 @@ void motor_soft_pwm(void)
 
 }
 
-void simple_drive_motor(void){
-	// 三相GPIO切换测试
-	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_SET);
-	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_RESET);
-	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_RESET);
-	HAL_Delay(500);
-
-	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_RESET);
-	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);
-	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_RESET);
-	HAL_Delay(500);
-
-	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_RESET);
-	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_RESET);
-	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_SET);
-	HAL_Delay(500);
-
-}
-
-void fixed_pwm(void){
-    for (int i = 0; i < PWM_RES; i++) {
-        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, (i < DUTY_CYCLE * PWM_RES) ? GPIO_PIN_SET : GPIO_PIN_RESET);
-        delay_us(DELAY_US);
-    }
-
-}
-
-static void SinPWM_Update(void)
-{
-    static float theta = 0.0f;
-    float Ua, Ub, Uc;
-
-    Ua = (sinf(theta) + 1.0f) / 2.0f;
-    Ub = (sinf(theta + 2.0f * PI / 3.0f) + 1.0f) / 2.0f;
-    Uc = (sinf(theta + 4.0f * PI / 3.0f) + 1.0f) / 2.0f;
-
-	for (int i = 0; i < PWM_RES; i++) {
-		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, (i < Ua * PWM_RES) ? GPIO_PIN_SET : GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, (i < Ub * PWM_RES) ? GPIO_PIN_SET : GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, (i < Uc * PWM_RES) ? GPIO_PIN_SET : GPIO_PIN_RESET);
-		delay_us(DELAY_US);
-	}
-
-
-    theta += 0.2f;
-    if (theta >= 2.0f * PI)
-        theta -= 2.0f * PI;
-}
 
 float AS5600_ReadAngle(void)
 {
@@ -122,9 +84,31 @@ void AS5600_ReadAndPrint(void)
     HAL_UART_Transmit(&huart1, (uint8_t*)msg, len, HAL_MAX_DELAY);
 }
 
+void Print_Current(uint8_t ch)
+{
+    if (ch >= 3) return;  // 防止越界
+
+    char msg[64];
+    uint16_t raw = adc_buf[ch];
+
+    // 1) ADC → 电压
+    float v = raw * ADC_REF_VOLT / ADC_MAX_CODE;
+
+    // 2) 电压 → 电流
+    float current = (v - VREF_OFFSET) * CURRENT_GAIN;
+
+    // 3) 输出
+    int len = snprintf(msg, sizeof(msg),
+                       "CH%d Current = %.3f A (ADC=%d, V=%.3fV)\r\n",
+                       ch, current, raw, v);
+
+    HAL_UART_Transmit(&huart1, (uint8_t*)msg, len, HAL_MAX_DELAY);
+}
+
 void User_Workspace_Init(void)
 {
 	DWT_Init();
+	HAL_ADC_Start_DMA(&hadc1, (uint32_t*)adc_buf, 3);  // 告诉DMA你的数组位置
     HAL_UART_Transmit(&huart1, (uint8_t*)"User Init OK\r\n", 13, HAL_MAX_DELAY);
 }
 
@@ -132,11 +116,11 @@ void User_Workspace_Init(void)
 
 void User_Workspace_Loop(void)
 {
-	//simple_drive_motor();
-	//fixed_pwm();
-	//SinPWM_Update();
-	motor_soft_pwm();
-	delay_us(50);
-	AS5600_ReadAndPrint();
+	motor_spwm();
+	//AS5600_ReadAndPrint();
+	//Print_Current(0);
+	//Print_Current(1);
+	//Print_Current(2);
+
 
 }
